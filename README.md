@@ -47,6 +47,9 @@ Multiple labels can go in one file, separated by a blank line.
   check digit verified.
 - `Service` is a known service level (`Ground`, `Express`, `Overnight`,
   `2Day`, `Priority`, `First`).
+- `Overnight` and `Express` shipments can't go to a PO box in the `To`
+  address (matched against `PO Box`, `P.O. Box`, and `Post Office Box`,
+  case-insensitive, on any street line).
 - Each address has a name, at least one street line, and a city line
   that parses into city / region / postal code.
 - The postal code matches the shape expected for the address's country

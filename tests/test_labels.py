@@ -62,6 +62,9 @@ class ValidLabelTests(unittest.TestCase):
             ("fractional weight in pounds", make_label(weight="0.5 lb"), {
                 "weight_value": 0.5, "weight_unit": "lb",
             }),
+            ("ground service allows PO box delivery", make_label(to_lines=[
+                "To: John Smith", "  PO Box 42", "  Portland, OR 97201",
+            ]), {}),
         ]
 
         for name, text, expected in cases:
@@ -113,6 +116,15 @@ class InvalidLabelTests(unittest.TestCase):
             ("address missing street line", make_label(from_lines=["From: Jane Doe", "  Springfield, IL 62704"]), "needs a name, a street line"),
             ("address with empty name", make_label(from_lines=["From: ", "  123 Main St", "  Springfield, IL 62704"]), "name is empty"),
             ("malformed city line", make_label(from_lines=["From: Jane Doe", "  123 Main St", "  Springfield IL"]), "malformed"),
+            ("overnight to a PO box is rejected", make_label(service="overnight", to_lines=[
+                "To: John Smith", "  PO Box 42", "  Portland, OR 97201",
+            ]), "cannot deliver to a PO box"),
+            ("express to a P.O. Box is rejected", make_label(service="express", to_lines=[
+                "To: John Smith", "  P.O. Box 42", "  Portland, OR 97201",
+            ]), "cannot deliver to a PO box"),
+            ("overnight to a PO box further down the street lines is rejected", make_label(service="overnight", to_lines=[
+                "To: John Smith", "  Suite 400", "  Post Office Box 42", "  Portland, OR 97201",
+            ]), "cannot deliver to a PO box"),
         ]
 
         for name, text, expected_message in cases:

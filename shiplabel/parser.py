@@ -51,6 +51,13 @@ REQUIRED_FIELDS = ("carrier", "tracking", "service", "from", "to", "weight")
 MULTILINE_FIELDS = frozenset({"from", "to"})
 ALLOWED_SERVICES = frozenset({"GROUND", "EXPRESS", "OVERNIGHT", "2DAY", "PRIORITY", "FIRST"})
 
+# Overnight/express are next-flight-out services carriers run with a driver
+# and a scan at a street address - none of the big three will guarantee a
+# PO box delivery on those tiers, so catch it at parse time instead of
+# letting the label print clean and bounce at the depot.
+NO_PO_BOX_SERVICES = frozenset({"OVERNIGHT", "EXPRESS"})
+PO_BOX_RE = re.compile(r"^(?:p\.?\s*o\.?\s*box|post\s+office\s+box)\b", re.IGNORECASE)
+
 # Real-world carriers use different tracking number shapes. These are close
 # enough to the public formats to catch typos without pulling in a full
 # carrier-specific validation library.
@@ -88,6 +95,7 @@ def parse_label(text: str) -> Label:
     service = _validate_service(fields["service"][0])
     sender = _parse_address("from", fields["from"])
     recipient = _parse_address("to", fields["to"])
+    _validate_po_box_restriction(service, recipient)
     weight_value, weight_unit = _parse_weight(fields["weight"][0])
 
     return Label(
@@ -198,6 +206,16 @@ def _usps_checksum_valid(tracking: str) -> bool:
     body = digits[:-1]
     total = sum(d * (3 if i % 2 == 0 else 1) for i, d in enumerate(reversed(body)))
     return (10 - (total % 10)) % 10 == check_digit
+
+
+def _validate_po_box_restriction(service: str, recipient: Address) -> None:
+    if service not in NO_PO_BOX_SERVICES:
+        return
+    for line in recipient.street_lines:
+        if PO_BOX_RE.match(line.strip()):
+            raise LabelError(
+                f"{service.title()} service cannot deliver to a PO box: {line!r}"
+            )
 
 
 def _validate_service(raw: str) -> str:
